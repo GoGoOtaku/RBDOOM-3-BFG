@@ -35,7 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Model_local.h"
 #include "RenderCommon.h"
 
-#define GLTF_YUP 1
+#define GLTF_YUP 0
 
 idCVar gltf_ForceBspMeshTexture( "gltf_ForceBspMeshTexture", "0", CVAR_SYSTEM | CVAR_BOOL, "all world geometry has the same forced texture" );
 
@@ -509,7 +509,11 @@ void idRenderModelGLTF::InitFromFile( const char* fileName )
 	gltfNode* modelNode = data->GetNode( "models", meshName );
 	if( modelNode )
 	{
-		ProcessNode( modelNode, mat4_identity, data );
+		// files import as y-up. Use this transform to change the model to z-up.
+		idMat3 rotation = idAngles( 0.0f, 0.0f, 90.0f ).ToMat3();
+		idMat4 axisTransform( rotation, vec3_origin );
+
+		ProcessNode( modelNode, axisTransform, data );
 
 		if( surfaces.Num() <= 0 )
 		{

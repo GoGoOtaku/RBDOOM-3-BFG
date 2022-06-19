@@ -368,39 +368,45 @@ bool gltfManager::ExtractMeshIdentifier( idStr& filename, int& meshId, idStr& me
 	idStr extension;
 	idStr meshStr;
 	filename.ExtractFileExtension( extension );
-	idStr file = filename.Left( filename.Length() - extension.Length() - 1 );
+	idStr file = filename;
+	file = file.StripFileExtension();
 	file.ExtractFileExtension( meshStr );
-	filename = file.Left( file.Length() - meshStr.Length() - 1 ) + "." + extension;
 
 	if( !extension.Length() )
 	{
 		idLib::Warning( "no gltf mesh identifier" );
 		return false;
 	}
-	idParser	parser( LEXFL_ALLOWPATHNAMES | LEXFL_NOSTRINGESCAPECHARS );
-	parser.LoadMemory( meshStr.c_str(), meshStr.Size(), "model:GltfmeshID" );
 
-	idToken token;
-	if( parser.ExpectAnyToken( &token ) )
+	if( meshStr.Length() )
 	{
-		if( ( token.type == TT_NUMBER ) && ( token.subtype & TT_INTEGER ) )
+		filename = file.Left( file.Length() - meshStr.Length() - 1 ) + "." + extension;
+
+		idParser	parser( LEXFL_ALLOWPATHNAMES | LEXFL_NOSTRINGESCAPECHARS );
+		parser.LoadMemory( meshStr.c_str(), meshStr.Size(), "model:GltfmeshID" );
+
+		idToken token;
+		if( parser.ExpectAnyToken( &token ) )
 		{
-			meshId = token.GetIntValue();
-		}
-		else if( token.type == TT_NAME )
-		{
-			meshName = token;
+			if( ( token.type == TT_NUMBER ) && ( token.subtype & TT_INTEGER ) )
+			{
+				meshId = token.GetIntValue();
+			}
+			else if( token.type == TT_NAME )
+			{
+				meshName = token;
+			}
+			else
+			{
+				parser.Warning( "malformed gltf mesh identifier" );
+				return false;
+			}
+			return true;
 		}
 		else
 		{
 			parser.Warning( "malformed gltf mesh identifier" );
-			return false;
 		}
-		return true;
-	}
-	else
-	{
-		parser.Warning( "malformed gltf mesh identifier" );
 	}
 
 	return false;
@@ -478,7 +484,7 @@ void idRenderModelGLTF::ProcessNode( gltfNode* modelNode, idMat4 trans, gltfData
 void idRenderModelGLTF::InitFromFile( const char* fileName )
 {
 	int meshID = -1;
-	idStr meshName;
+	idStr meshName = "head";
 	idStr gltfFileName = idStr( fileName );
 	gltfManager::ExtractMeshIdentifier( gltfFileName, meshID, meshName );
 
@@ -488,6 +494,10 @@ void idRenderModelGLTF::InitFromFile( const char* fileName )
 		{
 			common->FatalError( "multiple GLTF file loading not supported" );
 		}
+		gltfParser->Load( gltfFileName );
+	}
+	else
+	{
 		gltfParser->Load( gltfFileName );
 	}
 
@@ -500,6 +510,16 @@ void idRenderModelGLTF::InitFromFile( const char* fileName )
 	if( modelNode )
 	{
 		ProcessNode( modelNode, mat4_identity, data );
+
+		if( surfaces.Num() <= 0 )
+		{
+			common->Warning( "Couldn't load model: '%s'", name.c_str() );
+			MakeDefaultModel();
+			return;
+		}
+
+		// it is now available for use
+		purged = false;
 	}
 	else
 	{
